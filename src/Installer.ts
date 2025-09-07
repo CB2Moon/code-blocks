@@ -3,6 +3,7 @@ import * as path from "path";
 import * as tar from "tar";
 import * as vscode from "vscode";
 import { ExecException, ExecOptions, exec } from "child_process";
+import Parser from "tree-sitter";
 import { Result, err, ok } from "./result";
 import { existsSync } from "fs";
 import { getLogger } from "./outputChannel";
@@ -12,7 +13,7 @@ import which from "which";
 
 const NPM_INSTALL_URL = "https://nodejs.org/en/download";
 
-export type Language = NonNullable<unknown>;
+export type Language = Parser.Language;
 
 export function getAbsoluteParserDir(parsersDir: string, parserName: string): string {
     return path.resolve(path.join(parsersDir, parserName));
@@ -166,11 +167,11 @@ async function runCmd(
 
     const logs: string[] = [];
     return await new Promise((resolve) => {
-        const proc = exec(cmd, options, (error, stdout: string, _stderr) => {
+        const proc = exec(cmd, options, (error, stdout: string | Buffer, _stderr) => {
             if (error !== null) {
                 resolve(err([error, logs]));
             } else {
-                resolve(ok(stdout));
+                resolve(ok(stdout.toString()));
             }
         });
 

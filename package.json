@@ -121,9 +121,29 @@
       {
         "command": "codeBlocks.toggleBlockModeColors",
         "title": "Code Blocks: Toggle block mode colors"
+      },
+      {
+        "command": "codeBlocks.selectInside",
+        "title": "Code Blocks: Select content inside surrounding pair"
+      },
+      {
+        "command": "codeBlocks.selectSurroundingPair",
+        "title": "Code Blocks: Select surrounding pair delimiters"
       }
     ],
     "keybindings": [
+      {
+        "command": "codeBlocks.selectInside",
+        "key": "ctrl+alt+i",
+        "mac": "cmd+alt+i",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codeBlocks.selectSurroundingPair",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "editorTextFocus"
+      },
       {
         "command": "codeBlocks.moveUp",
         "key": "alt+left",

@@ -3,7 +3,6 @@ import * as configuration from "../configuration";
 import * as vscode from "vscode";
 import { CodeBlocksEditor } from "./CodeBlocksEditor";
 import { FileTree } from "../FileTree";
-
 import { Query } from "tree-sitter";
 
 export class CodeBlocksEditorProvider implements vscode.CustomTextEditorProvider {

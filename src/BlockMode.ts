@@ -1,10 +1,12 @@
 import * as codeBlocks from "./extension";
 import * as configuration from "./configuration";
 import * as vscode from "vscode";
-import { MoveSelectionDirection } from "./FileTree";
-import { UpdateSelectionDirection } from "./Selection";
+import type { MoveSelectionDirection } from "./FileTree";
+import { positionToPoint } from "./FileTree";
+import type { UpdateSelectionDirection } from "./Selection";
 import { getLogger } from "./outputChannel";
 import { state } from "./state";
+import { findContainingPair } from "./utilities/selectionUtils";
 
 export const blockModeActive = state(false);
 const colorConfig = state(configuration.getColorConfig());
@@ -147,6 +149,59 @@ function navigate(direction: "up" | "down" | "left" | "right"): void {
     }
 }
 
+function selectInside(): void {
+    const fileTree = codeBlocks.activeFileTree.get();
+    const activeEditor = vscode.window.activeTextEditor;
+    if (fileTree === undefined || activeEditor === undefined) {
+        return;
+    }
+
+    const selection = activeEditor.selection;
+    const node = fileTree.tree.rootNode.namedDescendantForPosition(positionToPoint(selection.start));
+
+    const innerPair = findContainingPair(node);
+    if (!innerPair) {
+        return;
+    }
+
+    const innerPairFullRange = new vscode.Range(innerPair.open.range.start, innerPair.close.range.end);
+
+    if (selection.isEqual(innerPair.contentRange)) {
+        // If content is selected, select the whole pair
+        activeEditor.selection = new vscode.Selection(innerPairFullRange.start, innerPairFullRange.end);
+    } else if (selection.isEqual(innerPairFullRange)) {
+        // If whole pair is selected, find the next parent pair and select its content
+        const outerPair = findContainingPair(innerPair.node.parent);
+        if (outerPair) {
+            activeEditor.selection = new vscode.Selection(outerPair.contentRange.start, outerPair.contentRange.end);
+        }
+    } else {
+        // Otherwise, select the content of the innermost pair
+        activeEditor.selection = new vscode.Selection(innerPair.contentRange.start, innerPair.contentRange.end);
+    }
+
+    activeEditor.revealRange(activeEditor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+}
+
+function selectSurroundingPair(): void {
+    const fileTree = codeBlocks.activeFileTree.get();
+    const activeEditor = vscode.window.activeTextEditor;
+    if (fileTree === undefined || activeEditor === undefined) {
+        return;
+    }
+
+    const node = fileTree.tree.rootNode.namedDescendantForPosition(positionToPoint(activeEditor.selection.start));
+    const pair = findContainingPair(node);
+
+    if (pair) {
+        activeEditor.selections = [
+            new vscode.Selection(pair.open.range.start, pair.open.range.end),
+            new vscode.Selection(pair.close.range.start, pair.close.range.end),
+        ];
+        activeEditor.revealRange(pair.open.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    }
+}
+
 function updateTargetHighlights(editor: vscode.TextEditor, vscodeSelection: vscode.Selection): void {
     if (!blockModeActive.get() || !colorConfig.get().enabled) {
         return;
@@ -264,6 +319,8 @@ export function activate(): vscode.Disposable[] {
         cmd("codeBlocks.navigateDownForce", () => navigate("down")),
         cmd("codeBlocks.navigateUp", () => navigate("left")),
         cmd("codeBlocks.navigateDown", () => navigate("right")),
+        cmd("codeBlocks.selectInside", selectInside),
+        cmd("codeBlocks.selectSurroundingPair", selectSurroundingPair),
         cmd("codeBlocks.toggleBlockModeColors", () => {
             const newConfig = colorConfig.get();
             newConfig.enabled = !newConfig.enabled;
