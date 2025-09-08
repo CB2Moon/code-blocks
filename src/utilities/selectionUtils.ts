@@ -1,5 +1,5 @@
-import * as vscode from "vscode";
 import type { SyntaxNode } from "tree-sitter";
+import * as vscode from "vscode";
 
 export type Pair = {
     open: { text: string; range: vscode.Range };
@@ -19,7 +19,7 @@ function nodeToRange(node: SyntaxNode): vscode.Range {
 function getPairFromDelimiters(
     node: SyntaxNode,
     openDelimiter: SyntaxNode | null | undefined,
-    closeDelimiter: SyntaxNode | null | undefined
+    closeDelimiter: SyntaxNode | null | undefined,
 ): Pair | undefined {
     if (!openDelimiter || !closeDelimiter) {
         return undefined;
@@ -46,7 +46,8 @@ function getPairFromDelimiters(
  * 3. For each parent node, it checks if its `type` matches a known "pair" type (e.g., "object", "array", "arguments").
  * 4. For most standard pairs, the opening and closing delimiters are simply the first and last children of the node (e.g., `{` and `}` for an "object").
  * 5. For special cases like "jsx_element", it performs a more specific check to find the opening and closing tags.
- * 6. Once a valid pair is found, it returns a `Pair` object with the ranges for the delimiters and the content. If it reaches the top of the tree without finding a pair, it returns `undefined`.
+ * 6. Once a valid pair is found, it returns a `Pair` object with the ranges for the delimiters and the content.
+ *    If it reaches the top of the tree without finding a pair, it returns `undefined`.
  *
  * @param startNode The node to start searching from. The search goes upwards from here.
  * @returns A `Pair` object if a containing pair is found, otherwise `undefined`.
@@ -54,8 +55,11 @@ function getPairFromDelimiters(
 export function findContainingPair(startNode: SyntaxNode | null | undefined): Pair | undefined {
     let node = startNode;
     while (node) {
+        console.log("node type:", node.type);
         const open = node.firstChild;
         const close = node.lastChild;
+        console.log("first child node type:", open?.type);
+        console.log("last child node type:", close?.type);
 
         switch (node.type) {
             // These node types are standard pairs where the first and last children are the delimiters.
@@ -66,6 +70,8 @@ export function findContainingPair(startNode: SyntaxNode | null | undefined): Pa
             case "string":
             case "named_imports":
             case "jsx_expression":
+            case "jsx_opening_element":
+            case "jsx_closing_element":
             case "arguments":
             case "formal_parameters":
             case "statement_block":

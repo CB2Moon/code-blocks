@@ -1,10 +1,10 @@
-import * as codeBlocks from "./extension";
-import * as configuration from "./configuration";
 import * as vscode from "vscode";
+import * as configuration from "./configuration";
+import * as codeBlocks from "./extension";
 import type { MoveSelectionDirection } from "./FileTree";
 import { positionToPoint } from "./FileTree";
-import type { UpdateSelectionDirection } from "./Selection";
 import { getLogger } from "./outputChannel";
+import type { UpdateSelectionDirection } from "./Selection";
 import { state } from "./state";
 import { findContainingPair } from "./utilities/selectionUtils";
 
@@ -49,10 +49,7 @@ function selectBlock(): void {
     const selection = fileTree.selectBlock(cursorIndex);
     if (selection !== undefined) {
         activeEditor.selection = selection.toVscodeSelection();
-        activeEditor.revealRange(
-            activeEditor.selection,
-            vscode.TextEditorRevealType.InCenterIfOutsideViewport
-        );
+        activeEditor.revealRange(activeEditor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }
 }
 
@@ -68,10 +65,7 @@ function updateSelection(direction: UpdateSelectionDirection): void {
     if (selection !== undefined) {
         selection.update(direction, fileTree.blocks);
         activeEditor.selection = selection.toVscodeSelection();
-        activeEditor.revealRange(
-            activeEditor.selection,
-            vscode.TextEditorRevealType.InCenterIfOutsideViewport
-        );
+        activeEditor.revealRange(activeEditor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }
 }
 
@@ -142,10 +136,7 @@ function navigate(direction: "up" | "down" | "left" | "right"): void {
 
     if (newPosition) {
         activeEditor.selection = new vscode.Selection(newPosition, newPosition);
-        activeEditor.revealRange(
-            activeEditor.selection,
-            vscode.TextEditorRevealType.InCenterIfOutsideViewport
-        );
+        activeEditor.revealRange(activeEditor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }
 }
 
@@ -159,25 +150,43 @@ function selectInside(): void {
     const selection = activeEditor.selection;
     const node = fileTree.tree.rootNode.namedDescendantForPosition(positionToPoint(selection.start));
 
-    const innerPair = findContainingPair(node);
-    if (!innerPair) {
+    let pair = findContainingPair(node);
+    if (!pair) {
         return;
     }
 
-    const innerPairFullRange = new vscode.Range(innerPair.open.range.start, innerPair.close.range.end);
+    // This loop will find the smallest pair that is not fully contained in the selection.
+    // In other words, it syncs up `pair` with the current `selection` level.
+    while (true) {
+        const pairFullRange = new vscode.Range(pair.open.range.start, pair.close.range.end);
+        if (selection.contains(pairFullRange) && !selection.isEqual(pairFullRange)) {
+            const outerPair = findContainingPair(pair.node.parent);
+            if (outerPair) {
+                pair = outerPair;
+            } else {
+                break; // No bigger pair, stay with this one
+            }
+        } else {
+            break; // Found the pair to work with
+        }
+    }
 
-    if (selection.isEqual(innerPair.contentRange)) {
-        // If content is selected, select the whole pair
-        activeEditor.selection = new vscode.Selection(innerPairFullRange.start, innerPairFullRange.end);
-    } else if (selection.isEqual(innerPairFullRange)) {
-        // If whole pair is selected, find the next parent pair and select its content
-        const outerPair = findContainingPair(innerPair.node.parent);
+    const pairFullRange = new vscode.Range(pair.open.range.start, pair.close.range.end);
+
+    if (selection.isEqual(pair.contentRange)) {
+        activeEditor.selection = new vscode.Selection(pairFullRange.start, pairFullRange.end);
+    } else if (selection.isEqual(pairFullRange)) {
+        const outerPair = findContainingPair(pair.node.parent);
         if (outerPair) {
-            activeEditor.selection = new vscode.Selection(outerPair.contentRange.start, outerPair.contentRange.end);
+            if (selection.isEqual(outerPair.contentRange)) {
+                const outerPairFullRange = new vscode.Range(outerPair.open.range.start, outerPair.close.range.end);
+                activeEditor.selection = new vscode.Selection(outerPairFullRange.start, outerPairFullRange.end);
+            } else {
+                activeEditor.selection = new vscode.Selection(outerPair.contentRange.start, outerPair.contentRange.end);
+            }
         }
     } else {
-        // Otherwise, select the content of the innermost pair
-        activeEditor.selection = new vscode.Selection(innerPair.contentRange.start, innerPair.contentRange.end);
+        activeEditor.selection = new vscode.Selection(pair.contentRange.start, pair.contentRange.end);
     }
 
     activeEditor.revealRange(activeEditor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
@@ -260,7 +269,7 @@ export function activate(): vscode.Disposable[] {
     const eventListeners = [
         vscode.window.onDidChangeActiveTextEditor(resetDecorations),
         vscode.window.onDidChangeTextEditorSelection((event) =>
-            updateTargetHighlights(event.textEditor, event.selections[0])
+            updateTargetHighlights(event.textEditor, event.selections[0]),
         ),
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration("colors")) {
@@ -293,19 +302,13 @@ export function activate(): vscode.Disposable[] {
             resetDecorations();
 
             if (vscode.window.activeTextEditor !== undefined) {
-                updateTargetHighlights(
-                    vscode.window.activeTextEditor,
-                    vscode.window.activeTextEditor.selection
-                );
+                updateTargetHighlights(vscode.window.activeTextEditor, vscode.window.activeTextEditor.selection);
             }
         }),
     ];
 
-    const cmd = (
-        command: string,
-        callback: (...args: unknown[]) => unknown,
-        thisArg?: unknown
-    ): vscode.Disposable => vscode.commands.registerCommand(command, callback, thisArg);
+    const cmd = (command: string, callback: (...args: unknown[]) => unknown, thisArg?: unknown): vscode.Disposable =>
+        vscode.commands.registerCommand(command, callback, thisArg);
     const commands = [
         cmd("codeBlocks.toggleBlockMode", () => toggleBlockMode()),
         cmd("codeBlocks.moveUp", async () => await moveSelection("swap-previous")),

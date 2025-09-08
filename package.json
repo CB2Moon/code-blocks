@@ -379,9 +379,13 @@
     "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --external:tree-sitter --format=cjs --platform=node",
     "esbuild": "yarn run esbuild-base --sourcemap",
     "esbuild-watch": "yarn run esbuild-base --sourcemap --watch",
+    "format": "bunx biome format --write",
+    "format:lint": "bunx biome lint --write",
+    "format:check": "bunx biome check --write",
     "lint": "tsc --noEmit && eslint src --ext ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.2.3",
     "@types/chai": "^4.3.5",
     "@types/glob": "^8.0.1",
     "@types/mocha": "^10.0.1",
@@ -389,12 +393,9 @@
     "@types/tar": "^6.1.5",
     "@types/vscode": "^1.79.0",
     "@types/which": "^3.0.0",
-    "@typescript-eslint/eslint-plugin": "^5.49.0",
-    "@typescript-eslint/parser": "^5.49.0",
     "@vscode/test-electron": "^2.2.2",
     "chai": "^4.3.7",
     "esbuild": "^0.18.11",
-    "eslint": "^8.44.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
     "typescript": "^5.1.6"
