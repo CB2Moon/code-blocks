@@ -55,11 +55,8 @@ function getPairFromDelimiters(
 export function findContainingPair(startNode: SyntaxNode | null | undefined): Pair | undefined {
     let node = startNode;
     while (node) {
-        console.log("node type:", node.type);
         const open = node.firstChild;
         const close = node.lastChild;
-        console.log("first child node type:", open?.type);
-        console.log("last child node type:", close?.type);
 
         switch (node.type) {
             // These node types are standard pairs where the first and last children are the delimiters.
@@ -78,7 +75,8 @@ export function findContainingPair(startNode: SyntaxNode | null | undefined): Pa
                 return getPairFromDelimiters(node, open, close);
 
             // JSX elements are a special case. The opening and closing tags are children,
-            // but we need to verify their types specifically.
+            // but we need to verify their types specifically and manually calculate their ranges
+            // as the parser can sometimes be unreliable with the end position of an opening tag.
             case "jsx_element":
                 if (open?.type === "jsx_opening_element" && close?.type === "jsx_closing_element") {
                     return getPairFromDelimiters(node, open, close);

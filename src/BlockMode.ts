@@ -147,49 +147,89 @@ function selectInside(): void {
         return;
     }
 
-    const selection = activeEditor.selection;
-    const node = fileTree.tree.rootNode.namedDescendantForPosition(positionToPoint(selection.start));
+    const selections = activeEditor.selections.length ? activeEditor.selections : [activeEditor.selection];
+    const newSelections: vscode.Selection[] = [];
 
-    let pair = findContainingPair(node);
-    if (!pair) {
-        return;
-    }
+    for (const selection of selections) {
+        const node = fileTree.tree.rootNode.namedDescendantForPosition(positionToPoint(selection.start));
 
-    // This loop will find the smallest pair that is not fully contained in the selection.
-    // In other words, it syncs up `pair` with the current `selection` level.
-    while (true) {
+        let pair = findContainingPair(node);
+        if (!pair) {
+            continue;
+        }
+
+        // This loop will find the smallest pair that is not fully contained in the selection.
+        // In other words, it syncs up `pair` with the current `selection` level.
+        while (true) {
+            const pairFullRange = new vscode.Range(pair.open.range.start, pair.close.range.end);
+            if (selection.contains(pairFullRange) && !selection.isEqual(pairFullRange)) {
+                const outerPair = findContainingPair(pair.node.parent);
+                if (outerPair) {
+                    pair = outerPair;
+                } else {
+                    break; // No bigger pair, stay with this one
+                }
+            } else {
+                break; // Found the pair to work with
+            }
+        }
+
         const pairFullRange = new vscode.Range(pair.open.range.start, pair.close.range.end);
-        if (selection.contains(pairFullRange) && !selection.isEqual(pairFullRange)) {
+
+        if (selection.isEqual(pair.contentRange)) {
+            newSelections.push(new vscode.Selection(pairFullRange.start, pairFullRange.end));
+        } else if (selection.isEqual(pairFullRange)) {
             const outerPair = findContainingPair(pair.node.parent);
             if (outerPair) {
-                pair = outerPair;
+                if (selection.isEqual(outerPair.contentRange)) {
+                    const outerPairFullRange = new vscode.Range(outerPair.open.range.start, outerPair.close.range.end);
+                    newSelections.push(new vscode.Selection(outerPairFullRange.start, outerPairFullRange.end));
+                } else {
+                    newSelections.push(new vscode.Selection(outerPair.contentRange.start, outerPair.contentRange.end));
+                }
             } else {
-                break; // No bigger pair, stay with this one
+                // No outer pair, keep current full range
+                newSelections.push(new vscode.Selection(pairFullRange.start, pairFullRange.end));
             }
         } else {
-            break; // Found the pair to work with
+            newSelections.push(new vscode.Selection(pair.contentRange.start, pair.contentRange.end));
         }
     }
 
-    const pairFullRange = new vscode.Range(pair.open.range.start, pair.close.range.end);
+    // Merge overlapping or touching selections
+    if (newSelections.length > 1) {
+        const ranges = newSelections.map(s => new vscode.Range(s.start, s.end));
+        ranges.sort((a, b) => {
+            if (a.start.isBefore(b.start)) return -1;
+            if (a.start.isAfter(b.start)) return 1;
+            if (a.end.isBefore(b.end)) return -1;
+            if (a.end.isAfter(b.end)) return 1;
+            return 0;
+        });
 
-    if (selection.isEqual(pair.contentRange)) {
-        activeEditor.selection = new vscode.Selection(pairFullRange.start, pairFullRange.end);
-    } else if (selection.isEqual(pairFullRange)) {
-        const outerPair = findContainingPair(pair.node.parent);
-        if (outerPair) {
-            if (selection.isEqual(outerPair.contentRange)) {
-                const outerPairFullRange = new vscode.Range(outerPair.open.range.start, outerPair.close.range.end);
-                activeEditor.selection = new vscode.Selection(outerPairFullRange.start, outerPairFullRange.end);
+        const merged: vscode.Range[] = [];
+        for (const r of ranges) {
+            const last = merged[merged.length - 1];
+            if (!last) {
+                merged.push(r);
             } else {
-                activeEditor.selection = new vscode.Selection(outerPair.contentRange.start, outerPair.contentRange.end);
+                // overlap or touch => merge
+                if (!r.start.isAfter(last.end)) {
+                    const end = r.end.isAfter(last.end) ? r.end : last.end;
+                    merged[merged.length - 1] = new vscode.Range(last.start, end);
+                } else {
+                    merged.push(r);
+                }
             }
         }
-    } else {
-        activeEditor.selection = new vscode.Selection(pair.contentRange.start, pair.contentRange.end);
+
+        activeEditor.selections = merged.map(r => new vscode.Selection(r.start, r.end));
+    } else if (newSelections.length === 1) {
+        activeEditor.selection = newSelections[0];
     }
 
-    activeEditor.revealRange(activeEditor.selection, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    const reveal = (activeEditor.selections[0] ?? activeEditor.selection);
+    activeEditor.revealRange(reveal, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
 function selectSurroundingPair(): void {
@@ -199,16 +239,42 @@ function selectSurroundingPair(): void {
         return;
     }
 
-    const node = fileTree.tree.rootNode.namedDescendantForPosition(positionToPoint(activeEditor.selection.start));
-    const pair = findContainingPair(node);
+    const selections = activeEditor.selections.length ? activeEditor.selections : [activeEditor.selection];
+    const pairSelections: vscode.Selection[] = [];
 
-    if (pair) {
-        activeEditor.selections = [
-            new vscode.Selection(pair.open.range.start, pair.open.range.end),
-            new vscode.Selection(pair.close.range.start, pair.close.range.end),
-        ];
-        activeEditor.revealRange(pair.open.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    for (const sel of selections) {
+        const node = fileTree.tree.rootNode.namedDescendantForPosition(positionToPoint(sel.start));
+        const pair = findContainingPair(node);
+        if (pair) {
+            pairSelections.push(new vscode.Selection(pair.open.range.start, pair.open.range.end));
+            pairSelections.push(new vscode.Selection(pair.close.range.start, pair.close.range.end));
+        }
     }
+
+    if (pairSelections.length === 0) {
+        return;
+    }
+
+    // De-duplicate identical selections, keep separate delimiters
+    pairSelections.sort((a, b) => {
+        if (a.start.isBefore(b.start)) return -1;
+        if (a.start.isAfter(b.start)) return 1;
+        if (a.end.isBefore(b.end)) return -1;
+        if (a.end.isAfter(b.end)) return 1;
+        return 0;
+    });
+    const seen = new Set<string>();
+    const deduped: vscode.Selection[] = [];
+    for (const s of pairSelections) {
+        const key = `${s.start.line}:${s.start.character}-${s.end.line}:${s.end.character}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            deduped.push(s);
+        }
+    }
+
+    activeEditor.selections = deduped;
+    activeEditor.revealRange(deduped[0], vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
 function updateTargetHighlights(editor: vscode.TextEditor, vscodeSelection: vscode.Selection): void {

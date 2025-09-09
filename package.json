@@ -292,7 +292,8 @@
       },
       "[shellscript]": {
         "codeBlocks.npmPackageName": "tree-sitter-bash",
-        "codeBlocks.parserName": "tree-sitter-bash"
+        "codeBlocks.parserName": "tree-sitter-bash",
+        "codeBlocks.subdirectory": "bash"
       },
       "[rust]": {
         "codeBlocks.queries": [
@@ -364,6 +365,18 @@
       "[csharp]": {
         "codeBlocks.npmPackageName": "tree-sitter-c-sharp",
         "codeBlocks.parserName": "tree-sitter-c_sharp"
+      },
+      "[javascript]": {
+        "codeBlocks.npmPackageName": "tree-sitter-javascript",
+        "codeBlocks.subdirectory": "javascript"
+      },
+      "[c]": {
+        "codeBlocks.npmPackageName": "tree-sitter-c",
+        "codeBlocks.subdirectory": "c"
+      },
+      "[go]": {
+        "codeBlocks.npmPackageName": "tree-sitter-go",
+        "codeBlocks.subdirectory": "go"
       }
     }
   },
@@ -376,6 +389,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile && yarn run lint",
     "test": "node ./out/test/runTest.js",
+    "b:test": "tsc -p ./ && node ./out/test/runTest.js",
     "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --external:tree-sitter --format=cjs --platform=node",
     "esbuild": "yarn run esbuild-base --sourcemap",
     "esbuild-watch": "yarn run esbuild-base --sourcemap --watch",

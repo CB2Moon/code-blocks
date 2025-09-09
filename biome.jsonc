@@ -15,7 +15,8 @@
                 "noEmptyPattern": "off"
             },
             "complexity": {
-                "noUselessFragments": "off"
+                "noUselessFragments": "off",
+                "useArrowFunction": "off"
             }
         }
     },
