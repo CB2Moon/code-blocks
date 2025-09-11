@@ -89,21 +89,63 @@ export async function downloadAndBuildParser(
     const parserDir = getAbsoluteParserDir(parsersDir, parserName);
     await mkdir(parserDir, { recursive: true });
 
-    const installResult = await runCmd(
-        `${npm} pack --verbose --json --pack-destination ${parserDir} ${parserNpmPackage}`,
-        {},
-        onData
-    );
+    const candidates = (() => {
+        const list = [parserNpmPackage];
+        const base = parserNpmPackage.includes("/") ? parserNpmPackage.split("/").pop()! : parserNpmPackage;
+
+        // Common fallbacks:
+        // - unscoped: tree-sitter-<lang>
+        // - scoped: @tree-sitter-grammars/tree-sitter-<lang>
+        const unscoped = base.startsWith("tree-sitter-") ? base : `tree-sitter-${base}`;
+        const scoped = `@tree-sitter-grammars/${unscoped}`;
+
+        const pushIfNew = (p: string) => {
+            if (!list.includes(p)) list.push(p);
+        };
+
+        pushIfNew(unscoped);
+        pushIfNew(scoped);
+
+        // If original already had scope, also try dropping scope
+        if (parserNpmPackage.includes("/")) {
+            const last = parserNpmPackage.split("/").pop()!;
+            pushIfNew(last);
+        }
+
+        return list;
+    })();
 
     let tarFilename: string | undefined = undefined;
-    switch (installResult.status) {
-        case "err":
-            logger.log(`Failed to install > ${JSON.stringify(installResult.result)}`);
-            return err(`Failed to install > ${JSON.stringify(installResult.result)}`);
+    let usedPackage: string | undefined = undefined;
+    const errors: string[] = [];
 
-        case "ok":
-            tarFilename = (JSON.parse(installResult.result) as { filename: string }[])[0].filename;
+    for (const pkg of candidates) {
+        logger.log(`Attempting to download parser package '${pkg}'`);
+        const res = await runCmd(
+            `${npm} pack --verbose --json --pack-destination ${parserDir} ${pkg}`,
+            {},
+            onData
+        );
+
+        if (res.status === "ok") {
+            try {
+                tarFilename = (JSON.parse(res.result) as { filename: string }[])[0].filename;
+                usedPackage = pkg;
+                break;
+            } catch (e: unknown) {
+                errors.push(`${pkg}: failed to parse npm pack output > ${JSON.stringify(e)}`);
+            }
+        } else {
+            errors.push(`${pkg}: ${res.result[0].name} ${res.result[0].message.replace(/\n/g, " > ")}`);
+        }
     }
+
+    if (!tarFilename) {
+        logger.log(`Failed to install. Tried: ${JSON.stringify(candidates)}. Errors: ${JSON.stringify(errors)}`);
+        return err(`Failed to install > ${JSON.stringify(errors)}`);
+    }
+
+    logger.log(`Download success using '${usedPackage}'. Extracting ${tarFilename} to ${parserDir}`);
 
     logger.log(`Download success. Extracting ${tarFilename} to ${parserDir}`);
 

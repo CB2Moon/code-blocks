@@ -58,30 +58,152 @@ export function findContainingPair(startNode: SyntaxNode | null | undefined): Pa
         const open = node.firstChild;
         const close = node.lastChild;
 
-        switch (node.type) {
-            // These node types are standard pairs where the first and last children are the delimiters.
-            case "parenthesized_expression":
-            case "object":
-            case "object_pattern":
-            case "array":
-            case "string":
-            case "named_imports":
-            case "jsx_expression":
-            case "jsx_opening_element":
-            case "jsx_closing_element":
-            case "arguments":
-            case "formal_parameters":
-            case "statement_block":
-                return getPairFromDelimiters(node, open, close);
+        // Edge-based pair builder for grammars that don't expose delimiters as child nodes
+        const makeEdgePair = (openText: string, closeText: string): Pair => {
+            const node_ = node!;
+            const startPos = pointToPosition(node_.startPosition);
+            const endPos = pointToPosition(node_.endPosition);
 
-            // JSX elements are a special case. The opening and closing tags are children,
-            // but we need to verify their types specifically and manually calculate their ranges
-            // as the parser can sometimes be unreliable with the end position of an opening tag.
+            const openStart = startPos;
+            const openEnd = new vscode.Position(openStart.line, openStart.character + openText.length);
+
+            const closeEnd = endPos;
+            const closeStart = new vscode.Position(closeEnd.line, closeEnd.character - closeText.length);
+
+            return {
+                open: { text: openText, range: new vscode.Range(openStart, openEnd) },
+                close: { text: closeText, range: new vscode.Range(closeStart, closeEnd) },
+                contentRange: new vscode.Range(openEnd, closeStart),
+                node: node_,
+            };
+        };
+        const detectEdgeDelimiters = (): { open: string; close: string } | undefined => {
+            const text = node!.text ?? "";
+            const leftTrimmed = text.trimStart();
+            const rightTrimmed = text.trimEnd();
+            if (leftTrimmed.length === 0 || rightTrimmed.length === 0) return undefined;
+            const first = leftTrimmed[0];
+            const last = rightTrimmed[rightTrimmed.length - 1];
+            const pairs: Record<string, string> = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'", "`": "`" };
+            const close = pairs[first];
+            if (close !== undefined && last === close) {
+                return { open: first, close };
+            }
+            return undefined;
+        };
+        const makeEdgePairAuto = (fallbackOpen: string, fallbackClose: string): Pair => {
+            const d = detectEdgeDelimiters();
+            const openText = d?.open ?? fallbackOpen;
+            const closeText = d?.close ?? fallbackClose;
+            return makeEdgePair(openText, closeText);
+        };
+
+        switch (node.type) {
+            // Use child-delimiter nodes when reliably available
             case "jsx_element":
                 if (open?.type === "jsx_opening_element" && close?.type === "jsx_closing_element") {
                     return getPairFromDelimiters(node, open, close);
                 }
                 break;
+            case "element": // HTML/Svelte elements: start_tag ... end_tag
+                if (open?.type === "start_tag" && close?.type === "end_tag") {
+                    return getPairFromDelimiters(node, open, close);
+                }
+                break;
+            case "jsx_expression":
+            case "jsx_opening_element":
+            case "jsx_closing_element":
+            case "named_imports":
+                return getPairFromDelimiters(node, open, close);
+            // Markdown inline fallback: scan text for [] or () pairs within the inline node
+            case "inline": {
+                const text = node.text ?? "";
+                const posAt = (idx: number): vscode.Position => {
+                    const base = node!.startPosition;
+                    let row = base.row;
+                    let col = base.column;
+                    for (let i = 0; i < idx && i < text.length; i++) {
+                        const ch = text[i];
+                        if (ch === "\n") {
+                            row++;
+                            col = 0;
+                        } else {
+                            col++;
+                        }
+                    }
+                    return new vscode.Position(row, col);
+                };
+                const buildPair = (openIdx: number, closeIdx: number, openChar: string, closeChar: string): Pair => {
+                    const node_ = node!;
+                    const openStart = posAt(openIdx);
+                    const openEnd = posAt(openIdx + 1);
+                    const closeStart = posAt(closeIdx);
+                    const closeEnd = posAt(closeIdx + 1);
+                    return {
+                        open: { text: openChar, range: new vscode.Range(openStart, openEnd) },
+                        close: { text: closeChar, range: new vscode.Range(closeStart, closeEnd) },
+                        contentRange: new vscode.Range(openEnd, closeStart),
+                        node: node_,
+                    };
+                };
+                // Prefer selecting [] around link text before () url
+                const sqOpen = text.indexOf("[");
+                const sqClose = sqOpen >= 0 ? text.indexOf("]", sqOpen + 1) : -1;
+                if (sqOpen >= 0 && sqClose > sqOpen) {
+                    return buildPair(sqOpen, sqClose, "[", "]");
+                }
+                const parenOpen = text.indexOf("(");
+                const parenClose = parenOpen >= 0 ? text.indexOf(")", parenOpen + 1) : -1;
+                if (parenOpen >= 0 && parenClose > parenOpen) {
+                    return buildPair(parenOpen, parenClose, "(", ")");
+                }
+                break;
+            }
+
+            // Parentheses-based nodes
+            case "parenthesized_expression":
+            case "arguments":
+            case "argument_list":
+            case "formal_parameters":
+            case "parameter_list":
+            case "parameters": // e.g. Rust
+                return makeEdgePairAuto("(", ")");
+
+            // Brace-based nodes (blocks, class bodies, etc.)
+            case "statement_block":
+            case "block": // C/C++/C#/Java/Go/Zig/CSS
+            case "compound_statement": // C/C++
+            case "class_body": // Java/Kotlin
+            case "enum_body": // Java/Kotlin
+            case "object":
+            case "object_pattern":
+            case "flow_mapping": // YAML { ... }
+                return getPairFromDelimiters(node, open, close);
+                // return makeEdgePairAuto("{", "}");
+
+            // Arrays / lists / sequences
+            case "array":
+            case "array_pattern": // JS/TS destructuring
+            case "list": // Python [ ... ]
+            case "flow_sequence": // YAML [ ... ]
+                return makeEdgePairAuto("[", "]");
+
+            // Rust macro token trees may be (), [], or {}
+            case "token_tree": {
+                const d = detectEdgeDelimiters();
+                if (d) return makeEdgePair(d.open, d.close);
+                break;
+            }
+
+            // Strings (best-effort; quotes are usually edge tokens)
+            case "string":
+            case "string_literal": {
+                const d = detectEdgeDelimiters();
+                if (d && (d.open === '"' || d.open === "'" || d.open === "`")) {
+                    return makeEdgePair(d.open, d.close);
+                }
+                break;
+            }
         }
 
         node = node.parent;
