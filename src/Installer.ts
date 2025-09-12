@@ -7,7 +7,7 @@ import Parser from "tree-sitter";
 import { Result, err, ok } from "./result";
 import { existsSync } from "fs";
 import { getLogger } from "./outputChannel";
-import { mkdir } from "fs/promises";
+import { mkdir, rm } from "fs/promises";
 import { parserFinishedInit } from "./extension";
 import which from "which";
 
@@ -317,6 +317,58 @@ export async function getLanguage(
         const msg = `Failed to load parser for language ${languageId} > ${loadResult.result}`;
 
         logger.log(msg);
+
+        const action = await vscode.window.showErrorMessage(
+            msg,
+            "Re-download",
+            "Cancel"
+        );
+
+        if (action === "Re-download") {
+            try {
+                logger.log(`Removing corrupted parser directory: ${parserPackagePath}`);
+                await rm(parserPackagePath, { recursive: true, force: true });
+            } catch (e: unknown) {
+                logger.log(`Failed to remove parser directory ${parserPackagePath} > ${JSON.stringify(e)}`);
+                return err(`Failed to remove parser directory ${parserPackagePath} > ${JSON.stringify(e)}`);
+            }
+
+            let number = 0;
+            const redownload = await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Notification,
+                    cancellable: false,
+                    title: `Re-installing ${npmPackageName}`,
+                },
+                async (progress) => {
+                    return await downloadAndBuildParser(
+                        parsersDir,
+                        npmPackageName,
+                        parserName,
+                        npm,
+                        treeSitterCli,
+                        (data) => progress.report({ message: data, increment: number++ })
+                    );
+                }
+            );
+
+            if (redownload.status === "err") {
+                const emsg = `Failed to re-download/build parser for language ${languageId} > ${redownload.result}`;
+                logger.log(emsg);
+                return err(emsg);
+            }
+
+            const reload = await loadParser(parsersDir, parserName, subdirectory);
+            if (reload.status === "err") {
+                const emsg = `Failed to load parser after re-download for language ${languageId} > ${reload.result}`;
+                logger.log(emsg);
+                return err(emsg);
+            }
+
+            logger.log(`Successfully re-downloaded and loaded parser for language ${languageId}`);
+            return ok(reload.result);
+        }
+
         return err(msg);
     }
 

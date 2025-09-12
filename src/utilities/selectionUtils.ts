@@ -114,6 +114,25 @@ export function findContainingPair(startNode: SyntaxNode | null | undefined): Pa
             case "jsx_opening_element":
             case "jsx_closing_element":
             case "named_imports":
+            case "statement_block":
+            case "block": // C/C++/C#/Java/Go/Zig/CSS
+            case "compound_statement": // C/C++
+            case "class_body": // Java/Kotlin
+            case "enum_body": // Java/Kotlin
+            case "object":
+            case "object_pattern":
+            case "flow_mapping": // YAML { ... }
+            case "array":
+            case "array_pattern": // JS/TS destructuring
+            case "list": // Python [ ... ]
+            case "flow_sequence": // YAML [ ... ]
+            case "parenthesized_expression":
+            case "arguments":
+            case "argument_list":
+            case "formal_parameters":
+            case "parameter_list":
+            case "token_tree":
+            case "parameters": // e.g. Rust
                 return getPairFromDelimiters(node, open, close);
             // Markdown inline fallback: scan text for [] or () pairs within the inline node
             case "inline": {
@@ -159,42 +178,6 @@ export function findContainingPair(startNode: SyntaxNode | null | undefined): Pa
                 }
                 break;
             }
-
-            // Parentheses-based nodes
-            case "parenthesized_expression":
-            case "arguments":
-            case "argument_list":
-            case "formal_parameters":
-            case "parameter_list":
-            case "parameters": // e.g. Rust
-                return makeEdgePairAuto("(", ")");
-
-            // Brace-based nodes (blocks, class bodies, etc.)
-            case "statement_block":
-            case "block": // C/C++/C#/Java/Go/Zig/CSS
-            case "compound_statement": // C/C++
-            case "class_body": // Java/Kotlin
-            case "enum_body": // Java/Kotlin
-            case "object":
-            case "object_pattern":
-            case "flow_mapping": // YAML { ... }
-                return getPairFromDelimiters(node, open, close);
-                // return makeEdgePairAuto("{", "}");
-
-            // Arrays / lists / sequences
-            case "array":
-            case "array_pattern": // JS/TS destructuring
-            case "list": // Python [ ... ]
-            case "flow_sequence": // YAML [ ... ]
-                return makeEdgePairAuto("[", "]");
-
-            // Rust macro token trees may be (), [], or {}
-            case "token_tree": {
-                const d = detectEdgeDelimiters();
-                if (d) return makeEdgePair(d.open, d.close);
-                break;
-            }
-
             // Strings (best-effort; quotes are usually edge tokens)
             case "string":
             case "string_literal": {
