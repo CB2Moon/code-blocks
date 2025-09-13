@@ -129,6 +129,10 @@
       {
         "command": "codeBlocks.selectSurroundingPair",
         "title": "Code Blocks: Select surrounding pair delimiters"
+      },
+      {
+        "command": "codeBlocks.handleEscape",
+        "title": "Code Blocks: (internal) Handle Escape in pair edit mode"
       }
     ],
     "keybindings": [
@@ -201,6 +205,11 @@
         "key": "shift+down",
         "mac": "shift+down",
         "when": "editorTextFocus && codeBlocks.blockMode"
+      },
+      {
+        "command": "codeBlocks.handleEscape",
+        "key": "escape",
+        "when": "editorTextFocus && codeBlocks.awaitingPairEdit"
       }
     ],
     "configuration": {
