@@ -133,6 +133,14 @@
       {
         "command": "codeBlocks.handleEscape",
         "title": "Code Blocks: (internal) Handle Escape in pair edit mode"
+      },
+      {
+        "command": "codeBlocks.pairEdit.deleteLeft",
+        "title": "Code Blocks: (internal) Pair edit delete left"
+      },
+      {
+        "command": "codeBlocks.pairEdit.deleteRight",
+        "title": "Code Blocks: (internal) Pair edit delete right"
       }
     ],
     "keybindings": [
@@ -144,8 +152,8 @@
       },
       {
         "command": "codeBlocks.selectSurroundingPair",
-        "key": "ctrl+alt+b",
-        "mac": "cmd+alt+b",
+        "key": "ctrl+alt+'",
+        "mac": "cmd+alt+'",
         "when": "editorTextFocus"
       },
       {
@@ -209,6 +217,16 @@
       {
         "command": "codeBlocks.handleEscape",
         "key": "escape",
+        "when": "editorTextFocus && codeBlocks.awaitingPairEdit"
+      },
+      {
+        "command": "codeBlocks.pairEdit.deleteLeft",
+        "key": "backspace",
+        "when": "editorTextFocus && codeBlocks.awaitingPairEdit"
+      },
+      {
+        "command": "codeBlocks.pairEdit.deleteRight",
+        "key": "delete",
         "when": "editorTextFocus && codeBlocks.awaitingPairEdit"
       }
     ],

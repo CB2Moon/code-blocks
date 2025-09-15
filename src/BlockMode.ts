@@ -30,6 +30,7 @@ const pairEditDecoration = vscode.window.createTextEditorDecorationType({
 let pairEditStatusBar: vscode.StatusBarItem | undefined;
 let __pairEditOriginalSelectionHashes: string[] = [];
 let __awaitingPairEdit = false;
+let __suppressPairEditSelectionValidation = false; // suppresses one selection validation cycle after internal pair-edit edits (delete/backspace)
 
 function resetDecorations(): void {
     // even if block mode isn't active, disposing these can't hurt
@@ -453,6 +454,13 @@ export function activate(): vscode.Disposable[] {
         vscode.window.onDidChangeTextEditorSelection((event) => {
             updateTargetHighlights(event.textEditor, event.selections[0]);
             if (__awaitingPairEdit && event.textEditor === vscode.window.activeTextEditor) {
+                // If we intentionally mutated selections (e.g. deleteLeft/deleteRight) keep mode alive.
+                if (__suppressPairEditSelectionValidation) {
+                    __pairEditOriginalSelectionHashes = event.selections.map(s => `${s.start.line}:${s.start.character}-${s.end.line}:${s.end.character}`);
+                    __suppressPairEditSelectionValidation = false;
+                    applyPairEditDecorations(event.textEditor);
+                    return;
+                }
                 const hashes = event.selections.map(s => `${s.start.line}:${s.start.character}-${s.end.line}:${s.end.character}`);
                 const same =
                     hashes.length === __pairEditOriginalSelectionHashes.length &&
@@ -531,6 +539,35 @@ export function activate(): vscode.Disposable[] {
             void handleTypeOverride(args[0] as { text: string } | undefined);
         }),
         cmd("codeBlocks.handleEscape", handleEscapeOverride),
+        // Pair-edit aware backspace: keep mode active, update stored hashes so selection watcher doesn't exit.
+        cmd("codeBlocks.pairEdit.deleteLeft", async () => {
+            if (__awaitingPairEdit) {
+                __suppressPairEditSelectionValidation = true;
+                await vscode.commands.executeCommand("deleteLeft");
+                applyPairEditDecorations(vscode.window.activeTextEditor ?? undefined);
+                // Refresh stored hashes after deletion (selections may have collapsed to insertion points)
+                const ed = vscode.window.activeTextEditor;
+                if (ed) {
+                    __pairEditOriginalSelectionHashes = ed.selections.map(s => `${s.start.line}:${s.start.character}-${s.end.line}:${s.end.character}`);
+                }
+            } else {
+                await vscode.commands.executeCommand("deleteLeft");
+            }
+        }),
+        // Pair-edit aware delete (forward delete)
+        cmd("codeBlocks.pairEdit.deleteRight", async () => {
+            if (__awaitingPairEdit) {
+                __suppressPairEditSelectionValidation = true;
+                await vscode.commands.executeCommand("deleteRight");
+                applyPairEditDecorations(vscode.window.activeTextEditor ?? undefined);
+                const ed = vscode.window.activeTextEditor;
+                if (ed) {
+                    __pairEditOriginalSelectionHashes = ed.selections.map(s => `${s.start.line}:${s.start.character}-${s.end.line}:${s.end.character}`);
+                }
+            } else {
+                await vscode.commands.executeCommand("deleteRight");
+            }
+        }),
     ];
 
     return [...uiDisposables, ...eventListeners, ...commands];
