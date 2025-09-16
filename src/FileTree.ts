@@ -4,13 +4,12 @@ import { Block, getQueryBlocks } from "./BlockTree";
 import Parser, { Query, SyntaxNode, Tree } from "tree-sitter";
 import { Result, err, ok } from "./result";
 
-import { Language } from "./Installer";
 import { Selection } from "./Selection";
 import { getLanguageConfig } from "./configuration";
 import { getLogger } from "./outputChannel";
 import { parserFinishedInit } from "./extension";
 
-function positionToPoint(pos: vscode.Position): Parser.Point {
+export function positionToPoint(pos: vscode.Position): Parser.Point {
     return {
         row: pos.line,
         column: pos.character,
@@ -48,7 +47,10 @@ export class FileTree implements vscode.Disposable {
 
         const queryStrings = getLanguageConfig(document.languageId).queries;
         if (queryStrings !== undefined) {
-            const language = parser.getLanguage() as Language;
+            const language = parser.getLanguage();
+            if (language === undefined) {
+                throw new Error("Language should be defined");
+            }
             this.queries = queryStrings.map((q) => new Query(language, q));
             this.blocks = getQueryBlocks(this.tree.rootNode, this.queries);
         }
@@ -73,7 +75,7 @@ export class FileTree implements vscode.Disposable {
     }
 
     public static async new(
-        language: Language,
+        language: Parser.Language,
         document: vscode.TextDocument
     ): Promise<Result<FileTree, unknown>> {
         await parserFinishedInit;

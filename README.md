@@ -20,6 +20,30 @@
 
 Supercharge your editor with syntactically aware code navigation and manipulation, **_in any language_** supported by [tree-sitter](https://tree-sitter.github.io/tree-sitter/#parsers).
 
+https://github.com/tree-sitter/tree-sitter/wiki/List-of-parsers
+
+## Features of this fork
+
+This fork is built upon [Code Blocks](https://github.com/selfint/code-blocks) and inspired by the idea of [Bracketeer](https://github.com/Pustelto/Bracketeer).
+
+The following features are added to Code Blocks:
+1. Select content inside brackets or quotes `ctrl/cmd+alt+i`
+    - support multi-selection
+    - repeating the command expands the selection, auto merge selections if overlapped
+2. Select surrounding pairs brackets or quotes `ctrl/cmd+alt+i`
+    - after selecting the surrounding pairs, you can remove or replace with other delimiters
+
+| Command                              | Keybinding (cmd on mac)      |
+| ------------------------------------ | ---------------------------- |
+| `codeBlocks.selectInside`            | `ctrl/cmd+alt+i`             |
+| `codeBlocks.selectSurroundingPair`   | `ctrl/cmd+alt+'`             |
+
+### Bracket / Quote Selection Demo
+
+
+
+<br>
+
 ## Features
 
 ### Block mode
