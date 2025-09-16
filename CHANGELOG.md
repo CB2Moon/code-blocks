@@ -1,5 +1,13 @@
 # Changelog
 
+# 0.7.1
+
+Implement Bracketeer features:
+
+1. Select content inside quotes and brackets, and expand selection if repeating the command
+
+2. Select surrounding quote/bracket pair for quick edit
+
 # 0.7.0
 
 Finally, switched to `node-tree-sitter`! 🎉

@@ -1,23 +1,23 @@
 {
-  "name": "code-blocks",
-  "publisher": "selfint",
-  "displayName": "Code Blocks",
-  "description": "Move code blocks around",
+  "name": "bracketeer-code-blocks",
+  "publisher": "CB2Moon",
+  "displayName": "Bracketeer Code Blocks",
+  "description": "Select, Edit, Move code blocks around",
   "repository": {
-    "url": "https://github.com/selfint/code-blocks",
+    "url": "https://github.com/CB2Moon/code-blocks",
     "type": "git"
   },
   "bugs": {
-    "url": "https://github.com/selfint/code-blocks/issues",
-    "email": "selfint@gmail.com"
+    "url": "https://github.com/CB2Moon/code-blocks/issues",
+    "email": "cbwang404@foxmail.com"
   },
-  "homepage": "https://github.com/selfint/code-blocks#readme",
-  "icon": "./assets/extension-logo.png",
+  "homepage": "https://github.com/CB2Moon/code-blocks#readme",
+  "icon": "assets/extension-logo.png",
   "galleryBanner": {
     "color": "#6295E3",
     "theme": "dark"
   },
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -28,6 +28,7 @@
     "Other"
   ],
   "keywords": [
+    "bracketeer",
     "blocks",
     "code-blocks",
     "refactor",
@@ -404,18 +405,18 @@
     }
   },
   "scripts": {
-    "install:all": "yarn install && cd webview-ui && yarn install",
-    "start:webview": "cd webview-ui && yarn run dev",
-    "build:webview": "cd webview-ui && yarn run build && yarn run check",
-    "vscode:prepublish": "yarn run esbuild-base --minify",
+    "install:all": "bun install && cd webview-ui && bun install",
+    "start:webview": "cd webview-ui && bun run dev",
+    "build:webview": "cd webview-ui && bun run build && bun run check",
+    "vscode:prepublish": "bun run esbuild-base --minify",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "yarn run compile && yarn run lint",
+    "pretest": "bun run compile && bun run lint",
     "test": "node ./out/test/runTest.js",
     "b:test": "tsc -p ./ && node ./out/test/runTest.js",
     "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --external:tree-sitter --format=cjs --platform=node",
-    "esbuild": "yarn run esbuild-base --sourcemap",
-    "esbuild-watch": "yarn run esbuild-base --sourcemap --watch",
+    "esbuild": "bun run esbuild-base --sourcemap",
+    "esbuild-watch": "bun run esbuild-base --sourcemap --watch",
     "format": "bunx biome format --write",
     "format:lint": "bunx biome lint --write",
     "format:check": "bunx biome check --write",
@@ -430,9 +431,12 @@
     "@types/tar": "^6.1.5",
     "@types/vscode": "^1.79.0",
     "@types/which": "^3.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.49.0",
+    "@typescript-eslint/parser": "^5.49.0",
     "@vscode/test-electron": "^2.2.2",
     "chai": "^4.3.7",
     "esbuild": "^0.18.11",
+    "eslint": "^8.44.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
     "typescript": "^5.1.6"
