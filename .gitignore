@@ -170,3 +170,4 @@ package
 parsers/
 test-parsers/
 *.vsix
+**/.DS_Store
