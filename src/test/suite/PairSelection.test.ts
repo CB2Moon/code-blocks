@@ -304,6 +304,34 @@ suite("Pair Selection", function () {
             expect(activeEditor.document.getText(selection)).to.equal("one two three");
         });
 
+        test("it selects inside complex TypeScript function parameter type", async function () {
+            const content = `function mapReferralForClient(referral: { status: "pending" | "accepted" | "rejected"; } & { lawyer: { id: number | null; user: { id: string; } | null } | null }) {}`;
+            const { activeEditor } = await openDocument(content, "typescript");
+
+            // Start with cursor on "status"
+            const idxStatus = content.indexOf("status");
+            const posStatus = activeEditor.document.positionAt(idxStatus);
+            activeEditor.selection = new vscode.Selection(posStatus, posStatus);
+
+            // 1. Select inside the first object type
+            await vscode.commands.executeCommand("codeBlocks.selectInside");
+            let selection = activeEditor.selection;
+            expect(activeEditor.document.getText(selection).trim()).to.equal(`status: "pending" | "accepted" | "rejected";`);
+
+            // 2. Select the first object braces
+            await vscode.commands.executeCommand("codeBlocks.selectInside");
+            selection = activeEditor.selection;
+            expect(activeEditor.document.getText(selection)).to.equal(`{ status: "pending" | "accepted" | "rejected"; }`);
+
+            // 3. Continue expanding to the parameter type
+            await vscode.commands.executeCommand("codeBlocks.selectInside");
+            selection = activeEditor.selection;
+            // Should select the entire type annotation
+            expect(activeEditor.document.getText(selection)).to.include("status");
+            expect(activeEditor.document.getText(selection)).to.include("lawyer");
+        });
+        
+
         // test("it selects inside Svelte script block", async function () {
         //     const content = `<script>let x = { a: 1 };</script>`;
         //     const { activeEditor } = await openDocument(content, "svelte");
@@ -638,5 +666,22 @@ suite("Pair Selection", function () {
             expect(activeEditor.document.getText(selections[0])).to.equal("[");
             expect(activeEditor.document.getText(selections[1])).to.equal("]");
         });
+
+        test("it selects surrounding braces in complex TypeScript function parameter type", async function () {
+            const content = `function mapReferralForClient(referral: { status: "pending" | "accepted" | "rejected"; } & { lawyer: { id: number | null; user: { id: string; } | null } | null }) {}`;
+            const { activeEditor } = await openDocument(content, "typescript");
+
+            // Start with cursor on "status"
+            const idxStatus = content.indexOf("status");
+            const posStatus = activeEditor.document.positionAt(idxStatus);
+            activeEditor.selection = new vscode.Selection(posStatus, posStatus);
+
+            await vscode.commands.executeCommand("codeBlocks.selectSurroundingPair");
+            const selections = activeEditor.selections;
+            expect(selections.length).to.equal(2);
+            expect(activeEditor.document.getText(selections[0])).to.equal("{");
+            expect(activeEditor.document.getText(selections[1])).to.equal("}");
+        });
+        
     });
 });

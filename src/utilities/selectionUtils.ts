@@ -91,12 +91,6 @@ export function findContainingPair(startNode: SyntaxNode | null | undefined): Pa
             }
             return undefined;
         };
-        const makeEdgePairAuto = (fallbackOpen: string, fallbackClose: string): Pair => {
-            const d = detectEdgeDelimiters();
-            const openText = d?.open ?? fallbackOpen;
-            const closeText = d?.close ?? fallbackClose;
-            return makeEdgePair(openText, closeText);
-        };
 
         switch (node.type) {
             // Use child-delimiter nodes when reliably available
@@ -120,6 +114,7 @@ export function findContainingPair(startNode: SyntaxNode | null | undefined): Pa
             case "class_body": // Java/Kotlin
             case "enum_body": // Java/Kotlin
             case "object":
+            case "object_type":
             case "object_pattern":
             case "flow_mapping": // YAML { ... }
             case "array":
